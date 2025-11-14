@@ -1,0 +1,104 @@
+/**
+ * @fileoverview Firestore Security Rules for PillPal Reminder application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model. Each user has full control
+ * over their own data, including user profiles, medication schedules, and alarms.
+ * No data is publicly accessible, and users cannot access data belonging to others.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles, where {userId} is the Firebase Auth UID.
+ * - /users/{userId}/medicationSchedules/{medicationScheduleId}: Stores medication schedules for each user.
+ * - /users/{userId}/medicationSchedules/{medicationScheduleId}/alarms/{alarmId}: Stores alarm settings for each medication schedule.
+ *
+ * Key Security Decisions:
+ * - User data is strictly segregated based on the Firebase Auth UID.
+ * - List operations are restricted to the owner of the data.
+ * - The rules prioritize simplicity and performance by leveraging path-based ownership.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Protects user profiles, allowing only the owner to read and write their own profile.
+     * @path /users/{userId}
+     * @allow (create) User with UID 'user_abc' can create their profile with matching ID.
+     *   Request: { "auth": { "uid": "user_abc" }, "resource": { "data": { "id": "user_abc", "username": "testuser", "languagePreference": "en" } } }
+     * @allow (get, update, delete) User with UID 'user_abc' can get, update, and delete their own profile.
+     *   Request: { "auth": { "uid": "user_abc" } }
+     * @allow (list) Listing users is not allowed.
+     * @deny (create) User with UID 'user_xyz' cannot create a profile with ID 'user_abc'.
+     *   Request: { "auth": { "uid": "user_xyz" }, "resource": { "data": { "id": "user_abc" } } }
+     * @deny (update) User with UID 'user_xyz' cannot update the profile of user 'user_abc'.
+     *   Request: { "auth": { "uid": "user_xyz" } }
+     * @deny (delete) User with UID 'user_xyz' cannot delete the profile of user 'user_abc'.
+     *   Request: { "auth": { "uid": "user_xyz" } }
+     * @principle Enforces document ownership for all operations on user profiles.
+     */
+    match /users/{userId} {
+      // Allow anyone to read the public profile
+      allow get: if isSignedIn();
+      allow list: if false;
+
+      // Only the user can create their own profile, but the id in the resource must match the userId
+      allow create: if isSignedIn() && request.auth.uid == userId && request.resource.data.id == userId;
+
+      // Only the owner can update/delete their profile
+      allow update, delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Protects medication schedules, allowing only the owner to manage their own schedules.
+     * @path /users/{userId}/medicationSchedules/{medicationScheduleId}
+     * @allow (create) User with UID 'user_abc' can create a medication schedule under their profile.
+     *   Request: { "auth": { "uid": "user_abc" } }
+     * @allow (get, list, update, delete) User with UID 'user_abc' can get, list, update, and delete their own medication schedules.
+     *   Request: { "auth": { "uid": "user_abc" } }
+     * @deny (create) User with UID 'user_xyz' cannot create a medication schedule under user 'user_abc''s profile.
+     *   Request: { "auth": { "uid": "user_xyz" } }
+     * @deny (get, list, update, delete) User with UID 'user_xyz' cannot get, list, update, or delete medication schedules under user 'user_abc''s profile.
+     *   Request: { "auth": { "uid": "user_xyz" } }
+     * @principle Restricts access to medication schedules to the owner.
+     */
+    match /users/{userId}/medicationSchedules/{medicationScheduleId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update, delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Protects alarms, allowing only the owner to manage alarms associated with their medication schedules.
+     * @path /users/{userId}/medicationSchedules/{medicationScheduleId}/alarms/{alarmId}
+     * @allow (create) User with UID 'user_abc' can create an alarm under their medication schedule.
+     *   Request: { "auth": { "uid": "user_abc" } }
+     * @allow (get, list, update, delete) User with UID 'user_abc' can get, list, update, and delete their own alarms.
+     *   Request: { "auth": { "uid": "user_abc" } }
+     * @deny (create) User with UID 'user_xyz' cannot create an alarm under user 'user_abc''s medication schedule.
+     *   Request: { "auth": { "uid": "user_xyz" } }
+     * @deny (get, list, update, delete) User with UID 'user_xyz' cannot get, list, update, or delete alarms under user 'user_abc''s medication schedule.
+     *   Request: { "auth": { "uid": "user_xyz" } }
+     * @principle Restricts access to alarms to the owner.
+     */
+    match /users/{userId}/medicationSchedules/{medicationScheduleId}/alarms/{alarmId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update, delete: if isExistingOwner(userId);
+    }
+  }
+
+  // Helper function to determine if the user is signed in
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  // Helper function to determine if the user is the owner of the document
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  // Helper function to determine if the user is the owner of the document and if the document exists
+  function isExistingOwner(userId) {
+    return isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+  }
+}

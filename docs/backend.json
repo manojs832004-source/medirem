@@ -1,0 +1,228 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user (patient) of the PillPal Reminder application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user (Firebase Auth UID)."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "languagePreference": {
+          "type": "string",
+          "description": "The user's preferred language for the app."
+        },
+        "caretakerId": {
+            "type": "string",
+            "description": "The UID of the caretaker monitoring this user. (Relationship: Caretaker 1:N User)"
+        }
+      },
+      "required": [
+        "id",
+        "displayName",
+        "email",
+        "languagePreference"
+      ]
+    },
+    "Caretaker": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Caretaker",
+      "type": "object",
+      "description": "Represents a caretaker who monitors users.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the caretaker (Firebase Auth UID)."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The caretaker's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The caretaker's email address."
+        }
+      },
+      "required": ["id", "displayName", "email"]
+    },
+    "MedicationSchedule": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "MedicationSchedule",
+      "type": "object",
+      "description": "Represents a user's medication schedule.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the medication schedule."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N MedicationSchedule)"
+        },
+        "medicationName": {
+          "type": "string",
+          "description": "The name of the medication."
+        },
+        "dosage": {
+          "type": "string",
+          "description": "The dosage of the medication."
+        },
+        "time": {
+          "type": "string",
+          "description": "The time the medication should be taken.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "medicationName",
+        "dosage",
+        "time"
+      ]
+    },
+    "MedicationLog": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "MedicationLog",
+        "type": "object",
+        "description": "Logs the status of a medication intake for a specific day.",
+        "properties": {
+            "id": { "type": "string" },
+            "userId": { "type": "string" },
+            "medicationScheduleId": { "type": "string" },
+            "date": { "type": "string", "format": "date", "description": "The date of the log entry (YYYY-MM-DD)." },
+            "status": { "type": "string", "enum": ["taken", "skipped"] },
+            "timestamp": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "userId", "medicationScheduleId", "date", "status", "timestamp"]
+    },
+    "EmergencyAlert": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "EmergencyAlert",
+        "type": "object",
+        "description": "Represents an emergency alert sent by a patient to their caretaker.",
+        "properties": {
+            "id": { "type": "string" },
+            "patientId": { "type": "string" },
+            "caretakerId": { "type": "string" },
+            "timestamp": { "type": "string", "format": "date-time" },
+            "isAcknowledged": { "type": "boolean" }
+        },
+        "required": ["id", "patientId", "caretakerId", "timestamp", "isAcknowledged"]
+    },
+    "Alarm": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Alarm",
+      "type": "object",
+      "description": "Represents an alarm for a medication schedule.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the alarm."
+        },
+        "medicationScheduleId": {
+          "type": "string",
+          "description": "Reference to MedicationSchedule. (Relationship: MedicationSchedule 1:1 Alarm)"
+        },
+        "isEnabled": {
+          "type": "boolean",
+          "description": "Indicates if the alarm is enabled."
+        },
+        "snoozeInterval": {
+          "type": "number",
+          "description": "The snooze interval in minutes."
+        }
+      },
+      "required": [
+        "id",
+        "medicationScheduleId",
+        "isEnabled"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles, identified by their Firebase Auth UID.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/caretakers/{caretakerId}",
+        "definition": {
+            "entityName": "Caretaker",
+            "schema": { "$ref": "#/backend/entities/Caretaker" },
+            "description": "Stores caretaker profiles, identified by their Firebase Auth UID."
+        }
+      },
+      {
+        "path": "/users/{userId}/medicationSchedules/{medicationScheduleId}",
+        "definition": {
+          "entityName": "MedicationSchedule",
+          "schema": {
+            "$ref": "#/backend/entities/MedicationSchedule"
+          },
+          "description": "Stores medication schedules for each user.  Path-based ownership ensures only the user can access their schedules.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user."
+            },
+            {
+              "name": "medicationScheduleId",
+              "description": "Unique identifier for the medication schedule."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/medicationLogs/{logId}",
+        "definition": {
+            "entityName": "MedicationLog",
+            "schema": { "$ref": "#/backend/entities/MedicationLog" },
+            "description": "Stores a log of taken or skipped medications for a user, viewable by their caretaker."
+        }
+      },
+      {
+        "path": "/caretakers/{caretakerId}/emergencyAlerts/{alertId}",
+        "definition": {
+            "entityName": "EmergencyAlert",
+            "schema": { "$ref": "#/backend/entities/EmergencyAlert" },
+            "description": "Stores emergency alerts from patients for a specific caretaker."
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to provide a secure and scalable foundation for the PillPal Reminder application, prioritizing authorization independence and clear security rules.\n\n1.  **Users Collection (`/users/{userId}`):** Stores user profiles.  Each document is uniquely identified by the `userId`, corresponding to the Firebase Auth `uid`.  This allows simple path-based ownership rules.\n\n2.  **Caretakers Collection (`/caretakers/{caretakerId}`):** A new top-level collection to store profiles for caretakers, keeping them distinct from regular users.\n\n3.  **Medication Schedules Collection (`/users/{userId}/medicationSchedules/{medicationScheduleId}`):**  This subcollection stores the medication schedules for each user. The `userId` in the path ensures that only the user can access their schedules. The `medicationScheduleId` provides a unique ID for each schedule.\n\n4.  **Medication Logs Collection (`/users/{userId}/medicationLogs/{logId}`):** A new subcollection under each user to log every 'taken' or 'skipped' event. This allows a caretaker to query this subcollection for a specific user to monitor their adherence.\n\n5.  **Emergency Alerts Collection (`/caretakers/{caretakerId}/emergencyAlerts/{alertId}`):** A new subcollection under each caretaker. When a patient triggers an alert, a document is created here. This makes it simple for the caretaker to query for any unacknowledged alerts associated with their own ID.\n"
+  }
+}
+
+    

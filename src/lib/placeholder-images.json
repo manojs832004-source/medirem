@@ -1,0 +1,10 @@
+{
+  "placeholderImages": [
+    {
+      "id": "empty-state",
+      "description": "A calm and serene image of a plant on a clean desk, symbolizing health and organization.",
+      "imageUrl": "https://images.unsplash.com/photo-1557337996-6785a501a815?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwbGFudCUyMGRlc2t8ZW58MHx8fHwxNzYxNTU1NTkyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "plant desk"
+    }
+  ]
+}
